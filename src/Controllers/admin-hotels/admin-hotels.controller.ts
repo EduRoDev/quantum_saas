@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post} from '@nestjs/common';
 import { AdminHotels } from 'src/Models/admins_hotels.models';
 import { AdminHotelsService } from 'src/Services/admin-hotels/admin-hotels.service';
+
 
 @Controller('admin-hotels')
 export class AdminHotelsController {

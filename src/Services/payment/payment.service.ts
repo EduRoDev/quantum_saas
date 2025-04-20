@@ -27,17 +27,13 @@ export class PaymentService {
         return result;
     }
 
-    async create(payment: Payment): Promise<{ payment: Payment; access_token: string }> {
+    async create(payment: Payment): Promise<{ payment: Payment}> {
         if (payment.price <= 0) throw new Error('the price must be greater than 0');
         if (!['PREMIUN', 'VIP'].includes(payment.name)) throw new Error('the name must be PREMIUN or VIP');
         payment.active = true;
         const newPayment = this.paymentRepository.create(payment);
         const savedPayment = await this.paymentRepository.save(newPayment);
-
-        const tokenPayload = { sub: savedPayment.id, name: savedPayment.name };
-        const access_token = this.jwtService.sign(tokenPayload);
-
-        return { payment: savedPayment, access_token };
+        return { payment: savedPayment};
     }
 
     async update(id: number, payment: Payment): Promise<Payment> {
