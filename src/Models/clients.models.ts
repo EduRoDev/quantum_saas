@@ -28,8 +28,6 @@ export class Client {
     type_document: string;
     @Column()
     number_document: string;
-    @Column({nullable: true})
-    token: string;
 
     @Column({ type: 'date', nullable: true })
     birth_date: Date;

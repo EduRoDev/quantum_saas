@@ -14,7 +14,7 @@ import { User } from '../Models/users.models';
   imports: [
     PassportModule,
     JwtModule.register({
-      secret: 'your-secret-key',
+      secret: 'yourSecretKey',
       signOptions: { expiresIn: '1h' },
     }),
     TypeOrmModule.forFeature([Client, User]),

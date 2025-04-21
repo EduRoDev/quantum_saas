@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post} from '@nestjs/common';
+
 import { Hotel } from 'src/Models/hotels.models';
 import { HotelsService } from 'src/Services/hotels/hotels.service';
 
