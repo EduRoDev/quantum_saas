@@ -32,12 +32,16 @@ export class User {
     country: string;
     @Column()
     city: string;
-    @Column({nullable: true})
-    token: string;
-
+    
     @OneToMany(() => AdminHotels, (admin_hotels) => admin_hotels.user)
     admin_hotel: AdminHotels[];
 
     @OneToMany(() => Payment, (payment) => payment.user)
     payments: Payment[];
+
+    @Column({default: false})
+    has_premium_service: boolean;
+
+    @Column({default: false})
+    has_vip_service: boolean;
 }

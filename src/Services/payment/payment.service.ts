@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Payment } from 'src/Models/payment_services.models';
+import { User } from 'src/Models/users.models';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
@@ -9,7 +10,8 @@ export class PaymentService {
     constructor(
         @InjectRepository(Payment)
         private paymentRepository: Repository<Payment>,
-        private readonly jwtService: JwtService
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
     ){}
 
     async findAll(): Promise<Payment[]>{
@@ -33,6 +35,19 @@ export class PaymentService {
         payment.active = true;
         const newPayment = this.paymentRepository.create(payment);
         const savedPayment = await this.paymentRepository.save(newPayment);
+        if (savedPayment.user) {
+            const user = await this.userRepository.findOne({
+                where: { id: savedPayment.user.id },
+                relations: ['payments']
+            });
+            
+            if (user) {
+                const activePayments = user.payments.filter(p => p.active);
+                user.has_premium_service = activePayments.some(p => p.name === 'PREMIUN');
+                user.has_vip_service = activePayments.some(p => p.name === 'VIP');
+                await this.userRepository.save(user);
+            }
+        }
         return { payment: savedPayment};
     }
 
@@ -46,13 +61,34 @@ export class PaymentService {
         result.description = payment.description;
         result.price = payment.price;
         result.active = payment.active;
-        return await this.paymentRepository.save(result);
+        const updatedPayment = await this.paymentRepository.save(result);
+
+        if (updatedPayment.user) {
+            const user = await this.userRepository.findOne({
+                where: { id: updatedPayment.user.id },
+                relations: ['payments']
+            });
+            
+            if (user) {
+                const activePayments = user.payments.filter(p => p.active);
+                user.has_premium_service = activePayments.some(p => p.name === 'PREMIUN');
+                user.has_vip_service = activePayments.some(p => p.name === 'VIP');
+                await this.userRepository.save(user);
+            }
+        }
+        return updatedPayment;
     }
 
     async remove(id: number): Promise<string>{
         const result = await this.findById(id);
         if (!result) throw new NotFoundException('Payment not found');
-        const deleted = await this.paymentRepository.delete(result);
+        await this.paymentRepository.delete(result);
         return 'Payment deleted successfully ';
+    }
+
+    async cancelService(paymentId: number): Promise<Payment> {
+        const payment = await this.findById(paymentId);
+        payment.active = false;
+        return await this.update(paymentId, payment);
     }
 }
