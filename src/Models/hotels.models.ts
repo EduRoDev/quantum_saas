@@ -10,7 +10,7 @@ export class Hotel {
     name: string;
     @Column()
     description: string;
-    @Column({type: 'enum', enum: ['hotel', 'hostel', 'motel', 'arbnb', 'other']})
+    @Column({type: 'enum', enum: ['hotel', 'hostel', 'motel', 'airbnb', 'other']})
     type_accomodation: string;
     @Column()
     country: string;

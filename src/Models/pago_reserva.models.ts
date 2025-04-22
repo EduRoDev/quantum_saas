@@ -43,4 +43,10 @@ export class PaymentReservation {
     @ManyToOne(() => Room, (room) => room.payment)
     @JoinColumn({ name: "room_id" })
     room: Room;
+
+    @Column()
+    created_at: Date; 
+      
+    @Column()
+    updated_at: Date;
 }

@@ -27,6 +27,11 @@ export class Reservation {
     @Column({ type: 'date', nullable: true })
     check_out: Date;
 
+    @Column()
+    created_at: Date;
+    @Column()
+    updated_at: Date;
+
     @OneToMany(() => PaymentReservation, (payment) => payment.reservation)
     payment: PaymentReservation[];
 }
