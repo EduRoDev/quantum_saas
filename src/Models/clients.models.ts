@@ -15,7 +15,9 @@ export class Client {
     phone: string;
     @Column()
     password: string;
-    @Column({type: 'enum', enum: ['admin', 'user'], default: 'user'})
+    @Column()
+    country: string;
+    @Column({default: 'user'})
     rol: string;
     @Column({type: 'enum', enum:[
         'CC',
