@@ -1,4 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { extname } from 'path';
+import * as fs from 'fs';
+import { diskStorage } from 'multer';
 import { Room } from 'src/Models/rooms.models';
 import { RoomsService } from 'src/Services/rooms/rooms.service';
 
@@ -18,9 +22,14 @@ export class RoomsController {
         return await this.roomsService.findById(id)
     }
 
-    @Get(':name')
+    @Get('name/:name')
     async findByName(@Param('name') name: string){
         return await this.roomsService.findByName(name)
+    }
+
+    @Get('status/:status')
+    async findByStatus(@Param('status') status: string){
+        return await this.roomsService.findByStatus(status)
     }
 
     @Get(':id/reservations')
@@ -28,9 +37,29 @@ export class RoomsController {
         return await this.roomsService.findReservations(id)
     }
 
+    @Get('rooms-by-admin/:adminId')
+    async findRoomsByAdmin(@Param('adminId') adminId: number){
+        return await this.roomsService.findRoomsByAdmin(adminId)
+    }
+
     @Post('create')
-    async create(@Body() data: Room){
-        return await this.roomsService.create(data)
+    @UseInterceptors(FileInterceptor('image',{
+        storage: diskStorage({
+            destination: (req, file, cb) => {
+                const uploadPath = './uploads/rooms';
+                if (!fs.existsSync(uploadPath)) {
+                    fs.mkdirSync(uploadPath, { recursive: true });
+                }
+                cb(null, uploadPath);
+            },
+            filename: (req, file, cb) => {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                cb(null, uniqueSuffix + extname(file.originalname));
+            }
+        })
+    }))
+    async create(@Body() data: Room, @UploadedFile() file: Express.Multer.File){
+        return await this.roomsService.create(data, file)
     }
 
     @Patch(':id')
@@ -43,3 +72,4 @@ export class RoomsController {
         return await this.roomsService.remove(id)
     }
 }
+

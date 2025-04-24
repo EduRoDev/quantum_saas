@@ -21,7 +21,7 @@ export class Room {
     status: string;
     @Column()
     ability: string;
-    @Column()
+    @Column({ nullable: true })
     image: string;
 
     @ManyToOne(() => Hotel, (hotel) => hotel.rooms)
