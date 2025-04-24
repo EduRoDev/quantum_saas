@@ -33,7 +33,6 @@ export class AuthService {
   async login(entity: 'client' | 'user', payload: any) {
     const tokenPayload: any = { sub: payload.id, email: payload.email, role: entity };
     
-    // Si es un usuario, incluir información de servicios
     if (entity === 'user') {
       tokenPayload.has_premium_service = payload.has_premium_service;
       tokenPayload.has_vip_service = payload.has_vip_service;
@@ -41,7 +40,8 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(tokenPayload),
-      // Incluir información de servicios en la respuesta también
+      id: payload.id,
+      email: payload.email,
       ...(entity === 'user' && {
         has_premium_service: payload.has_premium_service,
         has_vip_service: payload.has_vip_service

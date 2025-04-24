@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AdminHotels } from 'src/Models/admins_hotels.models';
 import { Hotel } from 'src/Models/hotels.models';
 import { Room } from 'src/Models/rooms.models';
 import { Repository } from 'typeorm';
@@ -10,7 +11,9 @@ export class RoomsService {
         @InjectRepository(Room)
         private roomsRepository: Repository<Room>,
         @InjectRepository(Hotel)
-        private hotelsRepository: Repository<Hotel>
+        private hotelsRepository: Repository<Hotel>,
+        @InjectRepository(AdminHotels)
+        private adminHotelRepository: Repository<AdminHotels>
     ){}
 
     async findAll(): Promise<Room[]> {
@@ -28,6 +31,17 @@ export class RoomsService {
         })
         if (!room) throw new NotFoundException('Room not found')
         return room
+    }
+
+    async findRoomsByAdmin(adminId: number): Promise<Room[]> {
+        const adminHotels = await this.adminHotelRepository.find({
+            where: { user: {id: adminId} },
+            relations: ['hotel', 'hotel.rooms']
+        })
+        if (adminHotels.length === 0) throw new NotFoundException('No hotels found for this admin')
+        const rooms = adminHotels.flatMap(adminHotel => adminHotel.hotel.rooms)
+        if (rooms.length === 0) throw new NotFoundException('No rooms found for this admin')
+        return rooms
     }
 
     async findByName(name: string): Promise<Room> {

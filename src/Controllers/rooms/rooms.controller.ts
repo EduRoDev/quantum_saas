@@ -28,6 +28,11 @@ export class RoomsController {
         return await this.roomsService.findReservations(id)
     }
 
+    @Get('rooms-by-admin/:adminId')
+    async findRoomsByAdmin(@Param('adminId') adminId: number){
+        return await this.roomsService.findRoomsByAdmin(adminId)
+    }
+
     @Post('create')
     async create(@Body() data: Room){
         return await this.roomsService.create(data)
