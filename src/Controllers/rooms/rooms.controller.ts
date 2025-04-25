@@ -63,8 +63,26 @@ export class RoomsController {
     }
 
     @Patch(':id')
-    async update(@Param('id') id: number, @Body() data: Partial<Room>){
-        return await this.roomsService.update(id, data)
+    @UseInterceptors(FileInterceptor('image',{
+        storage: diskStorage({
+            destination: (req, file, cb) => {
+                const uploadPath = './uploads/rooms';
+                if (!fs.existsSync(uploadPath)) {
+                    fs.mkdirSync(uploadPath, { recursive: true });
+                }
+                cb(null, uploadPath);
+            },
+            filename: (req, file, cb) => {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                cb(null, uniqueSuffix + extname(file.originalname));
+            }
+        })
+    }))
+    async update(
+        @Param('id') id: number, 
+        @Body() data: Partial<Room>, 
+        @UploadedFile() file?: Express.Multer.File){
+        return await this.roomsService.update(id, data, file)
     }
 
     @Delete(':id')
