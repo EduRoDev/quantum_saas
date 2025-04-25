@@ -1,9 +1,11 @@
+import { HttpService } from '@nestjs/axios';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { lastValueFrom } from 'rxjs';
 import { Client } from 'src/Models/clients.models';
 import { Reservation } from 'src/Models/reservations.models';
 import { Room } from 'src/Models/rooms.models';
-import { Between, Not, Repository } from 'typeorm';
+import { Between, DataSource, Not, Repository } from 'typeorm';
 
 @Injectable()
 export class BookingService {
@@ -14,6 +16,8 @@ export class BookingService {
         private readonly roomsRepository: Repository<Room>,
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
+        private dataSource: DataSource,
+        private readonly httpService: HttpService
     ){}
 
     async findAll(): Promise<Reservation[]> {
@@ -141,4 +145,155 @@ export class BookingService {
         }
         return reservation
     }
+
+
+    async getReservationInsights(hotelId: number): Promise<any[]>{
+        const query = `
+            WITH 
+            client_behavior AS (
+                SELECT 
+                    c.id AS client_id,
+                    COUNT(r.id) FILTER (WHERE r.status = 'canceled') AS past_cancellations,
+                    COUNT(r.id) FILTER (WHERE r.status = 'confirmed') AS past_confirmed,
+                    COUNT(r.id) AS total_reservations,
+                    CASE WHEN COUNT(r.id) > 0 THEN 
+                        COUNT(r.id) FILTER (WHERE r.status = 'canceled')::FLOAT / COUNT(r.id) 
+                    ELSE 0 END AS cancellation_rate,
+                    AVG(DATE_PART('day', r.check_out::timestamp - r.check_in::timestamp)) AS avg_stay_days,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm.price) AS median_spent,
+                    STDDEV(DATE_PART('day', r.check_in::timestamp - r.created_at::timestamp)) AS booking_stddev
+                FROM client c
+                LEFT JOIN reservation r ON r.client_id = c.id
+                LEFT JOIN room rm ON r.room_id = rm.id
+                WHERE c.rol = 'user'
+                GROUP BY c.id
+            ),
+            hotel_performance AS (
+                SELECT 
+                    h.id AS hotel_id,
+                    AVG(rm.price) AS avg_room_price,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm.price) AS median_room_price,
+                    COUNT(DISTINCT rm.id) AS total_rooms,
+                    COUNT(DISTINCT res.id) FILTER (WHERE res.status IN ('canceled', 'refunded')) AS hotel_canceled,
+                    COUNT(DISTINCT res.id) AS hotel_total_reservations,
+                    CASE WHEN COUNT(DISTINCT res.id) > 0 THEN 
+                        COUNT(DISTINCT res.id) FILTER (WHERE res.status IN ('canceled', 'refunded'))::FLOAT / 
+                        COUNT(DISTINCT res.id) 
+                    ELSE 0 END AS hotel_cancellation_rate,
+                    COUNT(DISTINCT res.id) FILTER (
+                        WHERE EXTRACT(MONTH FROM res.check_in) IN (6,7,8,12)
+                    ) AS high_season_reservations
+                FROM hotel h
+                LEFT JOIN room rm ON rm.hotel_id = h.id
+                LEFT JOIN reservation res ON res.room_id = rm.id
+                GROUP BY h.id
+            ),
+            reservation_context AS (
+                SELECT
+                    res.id AS reservation_id,
+                    COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed') AS concurrent_confirmed,
+                    COUNT(r2.id) AS concurrent_total,
+                    CASE WHEN COUNT(r2.id) > 0 THEN
+                        COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed')::FLOAT / COUNT(r2.id)
+                    ELSE 0 END AS concurrent_confirmation_rate,
+                    COUNT(r2.id) FILTER (
+                        WHERE r2.check_in::date = res.check_in::date
+                    ) AS same_day_checkins
+                FROM reservation res
+                JOIN room r ON res.room_id = r.id
+                JOIN hotel h ON r.hotel_id = h.id
+                LEFT JOIN reservation r2 ON r2.room_id IN (SELECT id FROM room WHERE hotel_id = h.id)
+                    AND r2.check_in <= res.check_out
+                    AND r2.check_out >= res.check_in
+                    AND r2.id != res.id
+                GROUP BY res.id
+            ),
+            seasonal_features AS (
+                SELECT
+                    res.id AS reservation_id,
+                    CASE WHEN EXTRACT(MONTH FROM res.check_in) = 12 
+                        AND EXTRACT(DAY FROM res.check_in) BETWEEN 15 AND 31 THEN 1
+                        ELSE 0 
+                    END AS is_holiday_season,
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM res.check_in) = 12 THEN 31 - EXTRACT(DAY FROM res.check_in)
+                        ELSE NULL 
+                    END AS days_until_holiday
+                FROM reservation res
+            )
+            SELECT
+                c.id AS client_id,
+                FLOOR(COALESCE(EXTRACT(YEAR FROM AGE(res.created_at, c.birth_date)), 30)/10)*10 AS client_age_group,
+                cb.past_cancellations AS client_past_cancellations,
+                cb.cancellation_rate AS client_historical_cancel_rate,
+                CASE 
+                    WHEN cb.total_reservations = 0 THEN 'new'
+                    WHEN cb.total_reservations BETWEEN 1 AND 3 THEN 'occasional'
+                    WHEN cb.total_reservations BETWEEN 4 AND 10 THEN 'regular'
+                    ELSE 'frequent'
+                END AS client_type,
+                CASE 
+                    WHEN cb.median_spent < hp.avg_room_price THEN 'below_avg'
+                    WHEN cb.median_spent < hp.avg_room_price * 1.3 THEN 'avg'
+                    ELSE 'above_avg'
+                END AS client_spending_profile,
+                hp.hotel_cancellation_rate,
+                CASE 
+                    WHEN hp.hotel_total_reservations < 10 THEN 'low_volume'
+                    WHEN hp.hotel_total_reservations < 50 THEN 'medium_volume'
+                    ELSE 'high_volume'
+                END AS hotel_volume_category,
+                rm.price AS room_price,
+                rm.price / NULLIF(hp.avg_room_price, 0) AS price_ratio_to_avg,
+                rm.price * DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp) AS total_booking_value,
+                DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp) AS stay_duration,
+                CASE
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 3 THEN '0-3_days'
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 7 THEN '3-7_days'
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 30 THEN '7-30_days'
+                    ELSE '30+_days'
+                END AS booking_lead_time,
+                CASE WHEN EXTRACT(MONTH FROM res.check_in) IN (6,7,8,12) THEN 1 ELSE 0 END AS is_peak_season,
+                sf.is_holiday_season,
+                rc.concurrent_confirmation_rate,
+                rc.same_day_checkins,
+                CASE 
+                    WHEN rc.concurrent_total = 0 THEN 'none'
+                    WHEN rc.concurrent_total < 5 THEN 'low'
+                    WHEN rc.concurrent_total < 15 THEN 'medium'
+                    ELSE 'high'
+                END AS concurrent_demand_level,
+                CASE 
+                    WHEN pr.amount IS NULL THEN 'no_payment'
+                    WHEN pr.amount = 0 THEN 'zero_payment'
+                    WHEN pr.amount < rm.price * 0.5 THEN 'deposit_only'
+                    WHEN pr.amount < rm.price THEN 'partial_payment'
+                    ELSE 'full_payment'
+                END AS payment_completeness,
+                CASE 
+                    WHEN res.status IN ('canceled', 'refunded') THEN 1 
+                    ELSE 0 
+                END AS is_canceled
+            FROM reservation res
+            JOIN client c ON res.client_id = c.id AND c.rol = 'user'
+            JOIN room rm ON res.room_id = rm.id
+            JOIN hotel h ON rm.hotel_id = h.id
+            LEFT JOIN payment_reservation pr ON pr.reservation_id = res.id
+            LEFT JOIN client_behavior cb ON c.id = cb.client_id
+            LEFT JOIN hotel_performance hp ON h.id = hp.hotel_id
+            LEFT JOIN reservation_context rc ON res.id = rc.reservation_id
+            LEFT JOIN seasonal_features sf ON res.id = sf.reservation_id
+            WHERE res.check_in IS NOT NULL
+            AND res.check_out IS NOT NULL
+            AND res.check_out > res.check_in
+            AND res.created_at <= res.check_in
+            AND h.id = $1;
+            `;
+
+            const result = await this.dataSource.query(query, [hotelId]);
+            const serviceSpring = 'http://localhost:8080/api/prediccion/predict'
+            const response = await lastValueFrom(this.httpService.post(serviceSpring, result))
+            return response.data;
+        }
 }
+
