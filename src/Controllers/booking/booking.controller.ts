@@ -21,6 +21,11 @@ export class BookingController {
         return await this.bookingService.findByClient(id);
     }
 
+    @Get(':hotelId/insights')
+    async getReservationInsights(@Param('hotelId') hotelId: number) {
+        return await this.bookingService.getReservationInsights(hotelId);
+    }
+
     @Post()
     async create(@Body() data: Reservation) {
         return await this.bookingService.create(data);

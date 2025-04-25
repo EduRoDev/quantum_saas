@@ -25,6 +25,7 @@ import { PaymentService } from './Services/payment/payment.service';
 import { PaymentController } from './Controllers/payment/payment.controller';
 import { Payment } from './Models/payment_services.models';
 import { AuthModule } from './auth/auth.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AuthModule } from './auth/auth.module';
       Payment
     ]),
     AuthModule,
+    HttpModule,
   ],
   controllers: [
     UsersController,
