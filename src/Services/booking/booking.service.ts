@@ -28,6 +28,17 @@ export class BookingService {
         return reservations;
     }
 
+    async findByHotel(id: number): Promise<Reservation[]>{
+        const reservations = await this.reservationRepository.find({
+            where: { room: { hotel: { id: id } } },
+            relations: ['room', 'client', 'payment'],
+            select: ['id', 'status', 'check_in', 'check_out'],
+            order: { check_in: 'ASC' }
+        });
+        if (reservations.length === 0) throw new NotFoundException('No reservations found');
+        return reservations;
+    }
+
     async findOne(id: number): Promise<Reservation> {
         const reservation = await this.reservationRepository.findOne({
             where: { id },
@@ -46,6 +57,17 @@ export class BookingService {
         })
         if ( reservation.length === 0) throw new NotFoundException('No reservations found')
         return reservation
+    }
+
+    async findByStatus(status: string): Promise<Reservation[]> {
+        const reservations = await this.reservationRepository.find({
+            where: { status: status },
+            relations: ['room', 'client', 'payment'],
+            select: ['id', 'status', 'check_in', 'check_out'],
+            order: { check_in: 'ASC' }
+        });
+        if (reservations.length === 0) throw new NotFoundException('No reservations found');
+        return reservations;
     }
 
     async create(data: Reservation): Promise<Reservation> {

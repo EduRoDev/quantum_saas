@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AdminHotels } from 'src/Models/admins_hotels.models';
 import { Hotel } from 'src/Models/hotels.models';
 import { Room } from 'src/Models/rooms.models';
@@ -30,6 +32,15 @@ export class RoomsService {
             relations: ['hotel', 'reservation']
         })
         if (!room) throw new NotFoundException('Room not found')
+        if( room.image){
+            const baseUrl = 'http://localhost:3000'; 
+            const normalizedPath = room.image.replace(/\\/g, '/'); 
+            if (!normalizedPath.startsWith(baseUrl)) {
+                room.image = `${baseUrl}/${normalizedPath}`;
+            } else {
+                room.image = normalizedPath; 
+            }
+        }
         return room
     }
 
@@ -79,13 +90,40 @@ export class RoomsService {
         return await this.roomsRepository.save(room);
     }
 
-    async update(id: number, data: Partial<Room>): Promise<Room> {
+    async update(id: number, data: Partial<Room>, file?: Express.Multer.File): Promise<Room> {
         const existingRoom = await this.roomsRepository.findOne({ where: { id } });
     
         if (!existingRoom) throw new NotFoundException('Room not found');
     
+        // Depuración: Verificar si el archivo se recibe
+        if (file) {
+            console.log('Archivo recibido:', file);
+        } else {
+            console.log('No se recibió ningún archivo');
+        }
+    
+        // Eliminar la imagen anterior si se sube una nueva
+        if (file && existingRoom.image) {
+            const oldImagePath = path.join(__dirname, '..', '..', '..', existingRoom.image);
+            try {
+                if (fs.existsSync(oldImagePath)) {
+                    fs.unlinkSync(oldImagePath);
+                    console.log('Imagen anterior eliminada:', oldImagePath);
+                }
+            } catch (error) {
+                console.error('Error al eliminar la imagen anterior:', error);
+            }
+        }
+    
         const room = this.roomsRepository.merge(existingRoom, data);
     
+        // Guardar la nueva imagen si se proporciona
+        if (file) {
+            room.image = file.path;
+            console.log('Nueva imagen guardada:', room.image);
+        }
+    
+        // Actualizar la relación con el hotel si se proporciona
         if (data.hotel?.id) {
             const hotel = await this.hotelsRepository.findOne({
                 where: { id: data.hotel.id }
