@@ -72,21 +72,34 @@ export class RoomsService {
     }
 
     async create(data: Partial<Room>, file: Express.Multer.File): Promise<Room> {
+        // Validar que se haya enviado el id del hotel
+        const hotelId = (data as any).hotelId || data.hotel?.id; // Asegúrate de manejar ambos casos
+        if (!hotelId) {
+            throw new NotFoundException('Hotel ID is required');
+        }
+
+        // Buscar el hotel en la base de datos
         const hotel = await this.hotelsRepository.findOne({
-            where: { id: data.hotel?.id }
+            where: { id: hotelId },
         });
-        if (!hotel) throw new NotFoundException('Hotel not found');
-    
-        
+        if (!hotel) {
+            throw new NotFoundException('Hotel not found');
+        }
+
+        // Manejar la imagen
         let imagePath: string | undefined;
         if (file) {
-            imagePath = file.path; 
+            imagePath = file.path;
         }
+
+        // Crear la habitación
         const room = this.roomsRepository.create({
             ...data,
-            hotel,
-            image: imagePath 
+            hotel, // Asocia el hotel encontrado
+            image: imagePath,
         });
+
+        // Guardar la habitación en la base de datos
         return await this.roomsRepository.save(room);
     }
 

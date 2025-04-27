@@ -23,6 +23,21 @@ export class PaymentBookingController {
         return await this.paymentBookingService.findAllByClient(id);
     }
 
+    @Get('status/:status/hotel/:hotelId')
+    async findByStatus(@Param('status') status: string, @Param('hotelId') hotelId: number) {
+        return await this.paymentBookingService.findByStatus(status,hotelId);
+    }
+
+    @Get('method/:method/hotel/:hotelId')
+    async findByMethod(@Param('method') method: string, @Param('hotelId') hotelId: number) {
+        return await this.paymentBookingService.findByMethod(method,hotelId);
+    }
+
+    @Get('name/:name/hotel/:id')
+    async findByName(@Param('name') name: string, @Param('id') id: number){
+        return await this.paymentBookingService.findByNameClient(name,id)
+    }
+
     @Get('room/:id')
     async findAllByRoom(@Param('id') id: number) {
         return await this.paymentBookingService.findAllByRoom(id);
@@ -31,6 +46,11 @@ export class PaymentBookingController {
     @Get('reservation/:id')
     async findAllByReservation(@Param('id') id: number) {
         return await this.paymentBookingService.findAllByReservation(id);
+    }
+    
+    @Get('hotel/:id')
+    async findAllByHotel(@Param('id') id: number) {
+        return await this.paymentBookingService.findAllByHotel(id);
     }
 
     @Post()

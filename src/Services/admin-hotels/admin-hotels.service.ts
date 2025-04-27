@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AdminHotels } from 'src/Models/admins_hotels.models';
 import { Hotel } from 'src/Models/hotels.models';
@@ -22,6 +22,16 @@ export class AdminHotelsService {
             relations: ['hotel']
         });
         return relations.map(relation => relation.hotel);
+    }
+
+    async findHotelByAdmin(userId: number): Promise<Hotel> {
+        const relation = await this.adminHotelsRepository.findOne({
+            where: { user: {id: userId} },
+            relations: ['hotel']
+        });
+
+        if (!relation) throw new NotFoundException('hotel not found');
+        return relation.hotel
     }
 
     async findAdminsByHotel(hotelId:number): Promise<User[]>{

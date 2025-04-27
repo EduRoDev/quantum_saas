@@ -19,6 +19,11 @@ export class AdminHotelsController {
         return await this.adminHotelsService.findAdminsByHotel(hotelId);
     }
 
+    @Get('users/:userId/hotel')
+    async findHotelByAdmin(@Param('userId', ParseIntPipe) userId: number){
+        return await this.adminHotelsService.findHotelByAdmin(userId);
+    }
+
     @Post('create')
     async create(@Body() data: AdminHotels){
         return await this.adminHotelsService.create(data);

@@ -21,7 +21,9 @@ export class PaymentBookingService {
     ){}
 
     async findAll(): Promise<PaymentReservation[]> {
-        const payment = await this.paymentBookingRepository.find()
+        const payment = await this.paymentBookingRepository.find({
+            relations: ['reservation', 'client', 'room']
+        })
         if ( payment.length === 0) throw new NotFoundException('No payment found')
         return payment
     }
@@ -29,7 +31,7 @@ export class PaymentBookingService {
     async findOne(id: number): Promise<PaymentReservation> {
         const payment = await this.paymentBookingRepository.findOne({
             where: { id },
-            relations: ['reservation']
+            relations: ['reservation', 'client', 'room']
         })
         if (!payment) throw new NotFoundException('Payment not found')
         return payment
@@ -53,10 +55,47 @@ export class PaymentBookingService {
         return payment
     }
 
+    async findByStatus(status: string, hotelId: number): Promise<PaymentReservation[]> {
+        const payment = await this.paymentBookingRepository.find({
+            where: { status: status, room: { hotel: { id: hotelId }}},
+            relations: ['reservation', 'client', 'room']
+        })
+        if ( payment.length === 0) throw new NotFoundException('No payment found')
+        return payment
+    }
+
+    async findByMethod(method: string, hotelId: number): Promise<PaymentReservation[]> {
+        const payment = await this.paymentBookingRepository.find({
+            where: { payment_method: method, room: { hotel: { id: hotelId }}},
+            relations: ['reservation', 'client', 'room']
+        })
+        if ( payment.length === 0) throw new NotFoundException('No payment found')
+        return payment
+    }
+
+    async findByNameClient(name: string, hotelId: number): Promise<PaymentReservation>{
+        const payment = await this.paymentBookingRepository.findOne({
+            where: {client: {name: name}, room: { hotel: {id: hotelId}}},
+            relations: ['reservation', 'client', 'room']
+        })
+        if (!payment) throw new NotFoundException("No client found")
+        return payment
+
+    }
+
     async findAllByReservation(id: number): Promise<PaymentReservation[]> {
         const payment = await this.paymentBookingRepository.find({
             where: { reservation: {id: id}},
             relations: ['reservation']
+        })
+        if ( payment.length === 0) throw new NotFoundException('No payment found')
+        return payment
+    }
+
+    async findAllByHotel(id: number): Promise<PaymentReservation[]> {
+        const payment = await this.paymentBookingRepository.find({
+            where: { room: { hotel: { id: id }}},
+            relations: ['reservation', 'client', 'room']
         })
         if ( payment.length === 0) throw new NotFoundException('No payment found')
         return payment

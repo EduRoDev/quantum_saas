@@ -70,6 +70,8 @@ export class BookingService {
         return reservations;
     }
 
+    
+
     async create(data: Reservation): Promise<Reservation> {
         const [room, client] = await Promise.all([
             this.roomsRepository.findOne({ where: { id: data.room.id }, relations: ['hotel'] }),

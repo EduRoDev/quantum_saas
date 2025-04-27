@@ -21,7 +21,7 @@ export class BookingController {
         return await this.bookingService.findByClient(id);
     }
 
-    @Get('hotel/:id')
+    @Get('hotel/reservation/:hotelId')
     async findByHotel(@Param('hotelId') hotelId: number) {
         return await this.bookingService.findByHotel(hotelId);
     }
