@@ -182,147 +182,153 @@ export class BookingService {
 
     async getReservationInsights(hotelId: number): Promise<any[]> {
         const query = `
-            WITH reservation_context AS (
-    SELECT
-        res.id AS reservation_id,
-        COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed') AS concurrent_confirmed,
-        COUNT(r2.id) AS concurrent_total,
-        CASE WHEN COUNT(r2.id) > 0 THEN
-            COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed')::FLOAT / COUNT(r2.id)
-        ELSE 0 END AS concurrent_confirmation_rate,
-        COUNT(r2.id) FILTER (
-            WHERE r2.check_in::date = res.check_in::date
-        ) AS same_day_checkins
-    FROM reservation res
-    JOIN room r ON res.room_id = r.id
-    JOIN hotel h ON r.hotel_id = h.id
-    LEFT JOIN reservation r2 ON r2.room_id IN (SELECT id FROM room WHERE hotel_id = h.id)
-        AND r2.check_in <= res.check_out
-        AND r2.check_out >= res.check_in
-        AND r2.id != res.id 
-    GROUP BY res.id
-)
+            WITH
+                reservation_context AS (
+                    SELECT
+                        res.id AS reservation_id,
+                        COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed') AS concurrent_confirmed,
+                        COUNT(r2.id) AS concurrent_total,
+                        CASE WHEN COUNT(r2.id) > 0 THEN
+                            COUNT(r2.id) FILTER (WHERE r2.status = 'confirmed')::FLOAT / COUNT(r2.id)
+                        ELSE 0 END AS concurrent_confirmation_rate,
+                        COUNT(r2.id) FILTER (
+                            WHERE r2.check_in::date = res.check_in::date
+                        ) AS same_day_checkins
+                    FROM reservation res
+                    JOIN room r ON res.room_id = r.id
+                    JOIN hotel h ON r.hotel_id = h.id
+                    LEFT JOIN reservation r2 ON r2.room_id IN (SELECT id FROM room WHERE hotel_id = h.id)
+                        AND r2.check_in <= res.check_out
+                        AND r2.check_out >= res.check_in
+                        AND r2.id != res.id 
+                    GROUP BY res.id
+                )
+            SELECT
+                c.id AS client_id,
+                FLOOR(COALESCE(EXTRACT(YEAR FROM AGE(res.created_at, c.birth_date)), 30)/10)*10 AS client_age_group,
 
-SELECT
-    c.id AS client_id,
-    FLOOR(COALESCE(EXTRACT(YEAR FROM AGE(res.created_at, c.birth_date)), 30)/10)*10 AS client_age_group,
+                
+                (SELECT COUNT(r_hist.id)
+                FROM reservation r_hist
+                WHERE r_hist.client_id = c.id
+                AND r_hist.id != res.id 
+                AND r_hist.status = 'canceled'
+                ) AS client_past_cancellations_strict,
 
-    (SELECT COUNT(r_hist.id)
-     FROM reservation r_hist
-     WHERE r_hist.client_id = c.id
-     AND r_hist.id != res.id 
-     AND r_hist.status = 'canceled') AS client_past_cancellations_strict,
+                (SELECT COUNT(r_hist.id)
+                FROM reservation r_hist
+                WHERE r_hist.client_id = c.id
+                AND r_hist.id != res.id 
+                ) AS client_total_reservations_strict,
 
-    (SELECT COUNT(r_hist.id)
-     FROM reservation r_hist
-     WHERE r_hist.client_id = c.id
-     AND r_hist.id != res.id) AS client_total_reservations_strict,
+                CASE
+                    WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) > 0
+                    THEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id AND r_hist.status = 'canceled')::FLOAT /
+                        (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id)
+                    ELSE 0
+                END AS client_historical_cancel_rate_strict,
 
-    CASE
-        WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) > 0
-        THEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id AND r_hist.status = 'canceled')::FLOAT /
-             (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id)
-        ELSE 0
-    END AS client_historical_cancel_rate_strict,
+                
+                CASE
+                    WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) = 0 THEN 'new'
+                    WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) BETWEEN 1 AND 3 THEN 'occasional'
+                    WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) BETWEEN 4 AND 10 THEN 'regular'
+                    ELSE 'frequent'
+                END AS client_type,
 
-    CASE
-        WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) = 0 THEN 'new'
-        WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) BETWEEN 1 AND 3 THEN 'occasional'
-        WHEN (SELECT COUNT(r_hist.id) FROM reservation r_hist WHERE r_hist.client_id = c.id AND r_hist.id != res.id) BETWEEN 4 AND 10 THEN 'regular'
-        ELSE 'frequent'
-    END AS client_type,
+                
+                (SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id) AS hotel_avg_room_price_for_profile,
+                CASE
+                    WHEN (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm_hist.price)
+                        FROM reservation r_hist
+                        JOIN room rm_hist ON r_hist.room_id = rm_hist.id
+                        WHERE r_hist.client_id = c.id AND r_hist.id != res.id) < (SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id) THEN 'below_avg'
+                    WHEN (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm_hist.price)
+                        FROM reservation r_hist
+                        JOIN room rm_hist ON r_hist.room_id = rm_hist.id
+                        WHERE r_hist.client_id = c.id AND r_hist.id != res.id) < (SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id) * 1.3 THEN 'avg'
+                    ELSE 'above_avg'
+                END AS client_spending_profile, 
 
-    (SELECT AVG(rm_avg.price)
-     FROM room rm_avg
-     WHERE rm_avg.hotel_id = h.id) AS hotel_avg_room_price_for_profile,
+                
+                (SELECT COUNT(DISTINCT res_hist.id)
+                FROM reservation res_hist
+                JOIN room rm_hist ON res_hist.room_id = rm_hist.id
+                WHERE rm_hist.hotel_id = h.id
+                AND res_hist.id != res.id 
+                AND res_hist.status IN ('canceled', 'refunded')
+                ) AS hotel_canceled_strict,
 
-    CASE
-        WHEN (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm_hist.price)
-              FROM reservation r_hist
-              JOIN room rm_hist ON r_hist.room_id = rm_hist.id
-              WHERE r_hist.client_id = c.id AND r_hist.id != res.id) < (SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id) THEN 'below_avg'
-        WHEN (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rm_hist.price)
-              FROM reservation r_hist
-              JOIN room rm_hist ON r_hist.room_id = rm_hist.id
-              WHERE r_hist.client_id = c.id AND r_hist.id != res.id) < (SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id) * 1.3 THEN 'avg'
-        ELSE 'above_avg'
-    END AS client_spending_profile, 
+                (SELECT COUNT(DISTINCT res_hist.id)
+                FROM reservation res_hist
+                JOIN room rm_hist ON res_hist.room_id = rm_hist.id
+                WHERE rm_hist.hotel_id = h.id
+                AND res_hist.id != res.id 
+                ) AS hotel_total_reservations_strict,
 
-    (SELECT COUNT(DISTINCT res_hist.id)
-     FROM reservation res_hist
-     JOIN room rm_hist ON res_hist.room_id = rm_hist.id
-     WHERE rm_hist.hotel_id = h.id
-     AND res_hist.id != res.id 
-     AND res_hist.status IN ('canceled', 'refunded')) AS hotel_canceled_strict,
+                CASE
+                    WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) > 0
+                    THEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id AND res_hist.status IN ('canceled', 'refunded'))::FLOAT /
+                        (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id)
+                    ELSE 0
+                END AS hotel_cancellation_rate_strict,
 
-    (SELECT COUNT(DISTINCT res_hist.id)
-     FROM reservation res_hist
-     JOIN room rm_hist ON res_hist.room_id = rm_hist.id
-     WHERE rm_hist.hotel_id = h.id
-     AND res_hist.id != res.id) AS hotel_total_reservations_strict,
+                
+                CASE
+                    WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) < 10 THEN 'low_volume'
+                    WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) < 50 THEN 'medium_volume'
+                    ELSE 'high_volume'
+                END AS hotel_volume_category,
 
-    CASE
-        WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) > 0
-        THEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id AND res_hist.status IN ('canceled', 'refunded'))::FLOAT /
-             (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id)
-        ELSE 0
-    END AS hotel_cancellation_rate_strict,
+                rm.price AS room_price,
+                
+                rm.price / NULLIF((SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id), 0) AS price_ratio_to_avg,
+                rm.price * DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp) AS total_booking_value,
+                DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp) AS stay_duration,
+                CASE
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 3 THEN '0-3_days'
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 7 THEN '3-7_days'
+                    WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 30 THEN '7-30_days'
+                    ELSE '30+_days'
+                END AS booking_lead_time,
+                CASE WHEN EXTRACT(MONTH FROM res.check_in) IN (6,7,8,12) THEN 1 ELSE 0 END AS is_peak_season,
 
-    CASE
-        WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) < 10 THEN 'low_volume'
-        WHEN (SELECT COUNT(DISTINCT res_hist.id) FROM reservation res_hist JOIN room rm_hist ON res_hist.room_id = rm_hist.id WHERE rm_hist.hotel_id = h.id AND res_hist.id != res.id) < 50 THEN 'medium_volume'
-        ELSE 'high_volume'
-    END AS hotel_volume_category,
+                
+                rc.concurrent_confirmation_rate,
+                rc.same_day_checkins,
+                CASE
+                    WHEN rc.concurrent_total = 0 THEN 'none'
+                    WHEN rc.concurrent_total < 5 THEN 'low'
+                    WHEN rc.concurrent_total < 15 THEN 'medium'
+                    ELSE 'high'
+                END AS concurrent_demand_level,
 
-    rm.price AS room_price,
-    
-    rm.price / NULLIF((SELECT AVG(rm_avg.price) FROM room rm_avg WHERE rm_avg.hotel_id = h.id), 0) AS price_ratio_to_avg,
-    rm.price * GREATEST(DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp), 1) AS total_booking_value,
-    GREATEST(DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp), 1) AS stay_duration,
-    
-    CASE
-        WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 3 THEN '0-3_days'
-        WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 7 THEN '3-7_days'
-        WHEN DATE_PART('day', res.check_in::timestamp - res.created_at::timestamp) < 30 THEN '7-30_days'
-        ELSE '30+_days'
-    END AS booking_lead_time,
-    
-    CASE WHEN EXTRACT(MONTH FROM res.check_in) IN (6,7,8,12) THEN 1 ELSE 0 END AS is_peak_season,
+                
+                CASE
+                    WHEN pr.amount IS NULL THEN 'no_payment'
+                    WHEN pr.amount = 0 THEN 'zero_payment'
+                    WHEN pr.amount < rm.price * 0.5 THEN 'deposit_only' 
+                    WHEN pr.amount < rm.price * DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp) THEN 'partial_payment' 
+                    ELSE 'full_payment'
+                END AS payment_completeness,
 
-    rc.concurrent_confirmation_rate,
-    rc.same_day_checkins,
-    
-    CASE
-        WHEN rc.concurrent_total = 0 THEN 'none'
-        WHEN rc.concurrent_total < 5 THEN 'low'
-        WHEN rc.concurrent_total < 15 THEN 'medium'
-        ELSE 'high'
-    END AS concurrent_demand_level,
+                
+                CASE
+                    WHEN res.status IN ('canceled', 'refunded') THEN 1
+                    ELSE 0
+                END AS is_canceled
 
-    CASE
-        WHEN pr.amount IS NULL THEN 'no_payment'
-        WHEN pr.amount = 0 THEN 'zero_payment'
-        WHEN pr.amount < rm.price * 0.5 THEN 'deposit_only' 
-        WHEN pr.amount < rm.price * GREATEST(DATE_PART('day', res.check_out::timestamp - res.check_in::timestamp), 1) THEN 'partial_payment' 
-        ELSE 'full_payment'
-    END AS payment_completeness,
+            FROM reservation res
+            JOIN client c ON res.client_id = c.id AND c.rol = 'user'
+            JOIN room rm ON res.room_id = rm.id
+            JOIN hotel h ON rm.hotel_id = h.id
+            LEFT JOIN payment_reservation pr ON pr.reservation_id = res.id
+            LEFT JOIN reservation_context rc ON res.id = rc.reservation_id 
 
-    CASE
-        WHEN res.status IN ('canceled', 'refunded') THEN 1
-        ELSE 0
-    END AS is_canceled
-
-FROM reservation res
-JOIN client c ON res.client_id = c.id AND c.rol = 'user'
-JOIN room rm ON res.room_id = rm.id
-JOIN hotel h ON rm.hotel_id = h.id
-LEFT JOIN payment_reservation pr ON pr.reservation_id = res.id
-LEFT JOIN reservation_context rc ON res.id = rc.reservation_id 
-
-WHERE res.check_in IS NOT NULL
-AND res.check_out IS NOT NULL
-AND res.check_out >= res.check_in
-AND res.created_at <= res.check_in
+            WHERE res.check_in IS NOT NULL
+            AND res.check_out IS NOT NULL
+            AND res.check_out > res.check_in
+            AND res.created_at <= res.check_in
             AND h.id = $1;
             `;
 
