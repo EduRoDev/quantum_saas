@@ -31,6 +31,11 @@ export class BookingController {
         return await this.bookingService.findByStatus(status);
     }
 
+    @Get('status/:status/hotel/:hotelId')
+    async findByStatusByHotel( @Param('status') status: string, @Param('hotelId') hotelId: number) {
+        return await this.bookingService.findByStatusByHotel(status, hotelId);
+    }
+
     @Get(':hotelId/insights')
     async getReservationInsights(@Param('hotelId') hotelId: number) {
         return await this.bookingService.getReservationInsights(hotelId);
