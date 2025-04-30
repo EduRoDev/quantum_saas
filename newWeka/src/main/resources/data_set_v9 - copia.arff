@@ -1,0 +1,27 @@
+@relation data_set_v9
+
+@attribute client_id numeric
+@attribute client_age_group numeric
+@attribute client_past_cancellations_strict numeric
+@attribute client_total_reservations_strict numeric
+@attribute client_historical_cancel_rate_strict numeric
+@attribute client_type {occasional,regular,new}
+@attribute hotel_avg_room_price_for_profile numeric
+@attribute client_spending_profile {above_avg,below_avg,avg}
+@attribute hotel_canceled_strict numeric
+@attribute hotel_total_reservations_strict numeric
+@attribute hotel_cancellation_rate_strict numeric
+@attribute hotel_volume_category {medium_volume,low_volume}
+@attribute room_price numeric
+@attribute price_ratio_to_avg numeric
+@attribute total_booking_value numeric
+@attribute stay_duration numeric
+@attribute booking_lead_time {30+_days,7-30_days,3-7_days}
+@attribute is_peak_season numeric
+@attribute concurrent_confirmation_rate numeric
+@attribute same_day_checkins numeric
+@attribute concurrent_demand_level {medium,none,low,high}
+@attribute payment_completeness {partial_payment,full_payment,deposit_only}
+@attribute is_canceled {1,0}
+
+@data
