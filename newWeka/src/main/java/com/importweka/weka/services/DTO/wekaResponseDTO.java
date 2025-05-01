@@ -10,8 +10,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class wekaResponseDTO {
-    private int clientId;
     private int reservaId;
+    private int clientId;
     private String prediction;
     private Map<String, Double> probabilities;
 }

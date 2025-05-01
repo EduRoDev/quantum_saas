@@ -59,6 +59,18 @@ export class BookingService {
         return reservation
     }
 
+    async findBookingClient(id: number, clientId: number): Promise<Reservation>{
+        const reservation = await this.reservationRepository.findOne({
+            where: { id: id,
+                client: { id: clientId } },
+            relations: ['room', 'client', 'payment'],
+            select: ['id', 'status', 'check_in', 'check_out'],
+            order: { check_in: 'ASC' }
+        })
+        if (!reservation) throw new NotFoundException('No reservations found')
+        return reservation
+    }
+
     async findByStatus(status: string): Promise<Reservation[]> {
         const reservations = await this.reservationRepository.find({
             where: { status: status },
