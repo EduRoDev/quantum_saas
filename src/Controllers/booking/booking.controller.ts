@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { BookingService } from 'src/Services/booking/booking.service';
 import { Reservation } from 'src/Models/reservations.models';
 
@@ -36,11 +36,11 @@ export class BookingController {
         return await this.bookingService.findByStatusByHotel(status, hotelId);
     }
 
-    @Get(':hotelId/insights')
-    async getReservationInsights(@Param('hotelId') hotelId: number) {
-        return await this.bookingService.getReservationInsights(hotelId);
+    @Get('insights/:hotelId')
+    async getReservationInsights(@Param('hotelId') hotelId: number, @Query('Mes') mes: number ) {
+        return await this.bookingService.getReservationInsights(hotelId, mes);
     }
-
+   
     @Get('reservation/:id/client/:clientId')
     async getReservationByClient(@Param("id") id: number, @Param("clientId") clientId: number){
         return await this.bookingService.findBookingClient(id, clientId)
