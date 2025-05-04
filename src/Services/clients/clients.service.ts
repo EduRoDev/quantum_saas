@@ -65,21 +65,28 @@ export class ClientsService {
     }
     
     async update(id: number, data: Partial<Client>): Promise<Client> {
+        if (data.password) {
+            const salt = await bcrypt.genSalt();
+            data.password = await bcrypt.hash(data.password, salt);
+        }
+
         const client = await this.clientRepository.preload({
             id,
             ...data
-        })
-        if (!client) throw new NotFoundException('Client not found')
-        if(client.email || client.number_document){
+        });
+        if (!client) throw new NotFoundException('Client not found');
+
+        if (client.email || client.number_document) {
             const exist = await this.clientRepository.findOne({
                 where: [
-                    { email: client.email ?? client.email},
-                    { number_document: client.number_document ?? client.number_document},
+                    { email: client.email ?? client.email },
+                    { number_document: client.number_document ?? client.number_document },
                 ]
-            })
-            if (exist && exist.id !== id) throw new ConflictException('Client already exists')
+            });
+            if (exist && exist.id !== id) throw new ConflictException('Client already exists');
         }
-        return await this.clientRepository.save(client)
+
+        return await this.clientRepository.save(client);
     }
 
     async remove(id: number): Promise<string>{
