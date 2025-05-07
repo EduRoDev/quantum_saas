@@ -27,6 +27,10 @@ import { Payment } from './Models/payment_services.models';
 import { AuthModule } from './auth/auth.module';
 import { HttpModule } from '@nestjs/axios';
 
+import { super_admin } from './Models/super_admin.models';
+import { SuperAdminService } from './Services/super_admin/super_admin.service';
+import { SuperAdminController } from './Controllers/super_admin/super_admin.controller';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -47,7 +51,8 @@ import { HttpModule } from '@nestjs/axios';
       AdminHotels,
       Reservation,
       PaymentReservation,
-      Payment
+      Payment,
+      super_admin
     ]),
     AuthModule,
     HttpModule,
@@ -61,6 +66,7 @@ import { HttpModule } from '@nestjs/axios';
     PaymentBookingController,
     BookingController,
     PaymentController,
+    SuperAdminController,
   ],
   providers: [
     UsersService,
@@ -71,6 +77,7 @@ import { HttpModule } from '@nestjs/axios';
     BookingService,
     PaymentBookingService,
     PaymentService,
+    SuperAdminService,
   ],
 })
 export class AppModule {}

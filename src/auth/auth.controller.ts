@@ -16,4 +16,9 @@ export class AuthController {
     const user = await this.authService.validateUser(body.email, body.password);
     return this.authService.login('user', user);
   }
+
+  @Post('login-super-admin')
+  async loginSuperAdmin(@Body('email') email: string, @Body('password') password: string) {
+    return this.authService.loginSuperAdmin(email, password);
+  }
 }

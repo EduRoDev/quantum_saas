@@ -12,6 +12,7 @@ import { User } from '../Models/users.models';
 import { AdminHotels } from '../Models/admins_hotels.models';
 import { Hotel } from '../Models/hotels.models';
 import { AdminHotelsService } from '../Services/admin-hotels/admin-hotels.service';
+import { super_admin } from 'src/Models/super_admin.models';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { AdminHotelsService } from '../Services/admin-hotels/admin-hotels.servic
       secret: 'yourSecretKey',
       signOptions: { expiresIn: '1h' },
     }),
-    TypeOrmModule.forFeature([Client, User, AdminHotels, Hotel]),
+    TypeOrmModule.forFeature([Client, User, AdminHotels, Hotel, super_admin]),
   ],
   providers: [AuthService, JwtStrategy, ClientsService, UsersService, AdminHotelsService],
   controllers: [AuthController],
