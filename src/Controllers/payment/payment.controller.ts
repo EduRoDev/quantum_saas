@@ -37,4 +37,14 @@ export class PaymentController {
     async remove(@Param('id') id: number){
         return await this.paymentService.remove(id);
     }
+
+    @Get('users/premium')
+    async findAllUsersWithPremiumService() {
+        return await this.paymentService.findAllUsersWithPremiumService();
+    }
+
+    @Get('users/vip')
+    async findAllUsersWithVipService() {
+        return await this.paymentService.findAllUsersWithVipService();
+    }
 }

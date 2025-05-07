@@ -91,4 +91,32 @@ export class PaymentService {
         payment.active = false;
         return await this.update(paymentId, payment);
     }
+
+    async findByPremiumService(userId: number): Promise<Payment[]> {
+        const user = await this.userRepository.findOne({ where: { id: userId }, relations: ['payments'] });
+        if (!user) throw new NotFoundException('User not found');
+        const payments = user.payments.filter(payment => payment.name === 'PREMIUN' && payment.active);
+        if (payments.length === 0) throw new NotFoundException('No active premium services found for this user');
+        return payments;
+    }
+
+    async findByVipService(userId: number): Promise<Payment[]> {
+        const user = await this.userRepository.findOne({ where: { id: userId }, relations: ['payments'] });
+        if (!user) throw new NotFoundException('User not found');
+        const payments = user.payments.filter(payment => payment.name === 'VIP' && payment.active);
+        if (payments.length === 0) throw new NotFoundException('No active VIP services found for this user');
+        return payments;
+    }
+
+    async findAllUsersWithPremiumService(): Promise<Payment[]> {
+        const payments = await this.paymentRepository.find({ relations: ['user'] });
+        return payments.filter(payment => payment.name === 'PREMIUN' && payment.active);
+
+    }
+
+    async findAllUsersWithVipService(): Promise<Payment[]> {
+        const payments = await this.paymentRepository.find({ relations: ['user'] });
+        return payments.filter(payment => payment.name === 'VIP' && payment.active);
+    }
+
 }
