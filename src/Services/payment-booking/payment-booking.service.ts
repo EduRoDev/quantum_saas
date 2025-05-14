@@ -128,7 +128,7 @@ export class PaymentBookingService {
             reservation.status = 'confirmed'
             await manager.save(Reservation, reservation)
 
-            room.status = 'busy'
+            room.status = 'booked'
             await manager.save(Room, room)
 
             return paymentSave

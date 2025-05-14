@@ -1,0 +1,32 @@
+@relation Nuevo
+
+@attribute reservation_id numeric
+@attribute client_id numeric
+@attribute hotel_id numeric
+@attribute client_age_group numeric
+@attribute client_past_cancellations_strict numeric
+@attribute client_total_reservations_strict numeric
+@attribute client_historical_cancel_rate_strict numeric
+@attribute client_type {occasional,new,regular}
+@attribute hotel_avg_room_price_for_profile numeric
+@attribute client_spending_profile {avg_spender,below_avg_spender,new_client,above_avg_spender}
+@attribute hotel_canceled_strict numeric
+@attribute hotel_total_reservations_strict numeric
+@attribute hotel_cancellation_rate_strict numeric
+@attribute hotel_volume_category {high_volume}
+@attribute room_price numeric
+@attribute price_ratio_to_avg numeric
+@attribute stay_duration numeric
+@attribute total_booking_value numeric
+@attribute booking_lead_time_category {lead_30_plus_days,lead_7_29_days,lead_3_6_days}
+@attribute booking_lead_time_days numeric
+@attribute is_peak_season numeric
+@attribute concurrent_total numeric
+@attribute concurrent_confirmed numeric
+@attribute concurrent_confirmation_rate numeric
+@attribute same_day_checkins numeric
+@attribute concurrent_demand_level {demand_high}
+@attribute payment_status_detail {P_Paid_LessThan50Pct,P_Paid_50To99Pct,P_Paid_FullOrMore}
+@attribute is_canceled {0,1}
+
+@data

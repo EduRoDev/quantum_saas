@@ -25,14 +25,14 @@ public class wekaServices {
     @PostConstruct
     public void init() throws Exception {
         // Cargar el modelo y la estructura ARFF
-        InputStream modelStream = getClass().getClassLoader().getResourceAsStream("is_canceled - copia.model");
-        InputStream arffStream = getClass().getClassLoader().getResourceAsStream("dataset.arff");
+        InputStream modelStream = getClass().getClassLoader().getResourceAsStream("Modelo - copia.model");
+        InputStream arffStream = getClass().getClassLoader().getResourceAsStream("Nuevo.csv - copia.arff");
 
         if (modelStream == null) {
-            throw new Exception("El archivo 'is_canceled - copia.model' no se pudo encontrar en el classpath.");
+            throw new Exception("El archivo 'Modelo - copia.model' no se pudo encontrar en el classpath.");
         }
         if (arffStream == null) {
-            throw new Exception("El archivo 'dataset.arff' no se pudo encontrar en el classpath.");
+            throw new Exception("El archivo 'Nuevo.csv - copia.arff' no se pudo encontrar en el classpath.");
         }
 
         model = (Classifier) weka.core.SerializationHelper.read(modelStream);
@@ -66,15 +66,15 @@ public class wekaServices {
             instance.setValue(dataStructure.attribute("price_ratio_to_avg"), input.getPrice_ratio_to_avg());
             instance.setValue(dataStructure.attribute("stay_duration"), input.getStay_duration());
             instance.setValue(dataStructure.attribute("total_booking_value"), input.getTotal_booking_value());
-            instance.setValue(dataStructure.attribute("booking_lead_time"), input.getBooking_lead_time());
+            instance.setValue(dataStructure.attribute("booking_lead_time_category"), input.getBooking_lead_time_category());
+            instance.setValue(dataStructure.attribute("booking_lead_time_days"), input.getBooking_lead_time_days());
             instance.setValue(dataStructure.attribute("is_peak_season"), input.getIs_peak_season());
             instance.setValue(dataStructure.attribute("concurrent_total"), input.getConcurrent_total());
             instance.setValue(dataStructure.attribute("concurrent_confirmed"), input.getConcurrent_confirmed());
             instance.setValue(dataStructure.attribute("concurrent_confirmation_rate"), input.getConcurrent_confirmation_rate());
             instance.setValue(dataStructure.attribute("same_day_checkins"), input.getSame_day_checkins());
             instance.setValue(dataStructure.attribute("concurrent_demand_level"), input.getConcurrent_demand_level());
-            instance.setValue(dataStructure.attribute("payment_completeness"), input.getPayment_completeness());
-            
+            instance.setValue(dataStructure.attribute("payment_status_detail"), input.getPayment_status_detail());
 
             // Realizar la predicción
             double[] distribution = model.distributionForInstance(instance);
@@ -97,7 +97,7 @@ public class wekaServices {
             }
 
             // Agregar la respuesta con el client_id
-            responses.add(new wekaResponseDTO(input.getReservation_id(),input.getClient_id(), clasePredicha, probabilidades));
+            responses.add(new wekaResponseDTO(input.getReservation_id(), input.getClient_id(), clasePredicha, probabilidades));
         }
 
         return responses;
