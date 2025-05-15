@@ -5,7 +5,7 @@ import { User } from "./users.models";
 export class Payment {
     @PrimaryGeneratedColumn()
     id: number;
-    @Column({ type: 'enum', enum: ['PREMIUN', 'VIP']})
+    @Column({ type: 'enum', enum: ['PREMIUN', 'VIP', 'BASIC'] })
     name: string;
     @Column()
     description: string;
