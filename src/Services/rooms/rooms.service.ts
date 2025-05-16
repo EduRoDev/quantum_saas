@@ -26,6 +26,29 @@ export class RoomsService {
         return rooms
     }
 
+    async findAllWithImage(): Promise<Room[]> {
+        const rooms = await this.roomsRepository.find({
+            relations: ['hotel', 'reservation']
+        });
+
+        if (rooms.length === 0) throw new NotFoundException('No rooms found');
+
+        return rooms.map(room => {
+            if (room.image) {
+                const baseUrl = 'http://localhost:3000';
+                const normalizedPath = room.image.replace(/\\/g, '/');
+                if (!normalizedPath.startsWith(baseUrl)) {
+                    room.image = `${baseUrl}/${normalizedPath}`;
+                } else {
+                    room.image = normalizedPath;
+                }
+            } else {
+                room.image = 'No tiene imagen';
+            }
+            return room;
+        });
+    }
+
     async findById(id: number): Promise<Room> {
         const room = await this.roomsRepository.findOne({
             where: { id },
@@ -52,7 +75,20 @@ export class RoomsService {
         if (adminHotels.length === 0) throw new NotFoundException('No hotels found for this admin')
         const rooms = adminHotels.flatMap(adminHotel => adminHotel.hotel.rooms)
         if (rooms.length === 0) throw new NotFoundException('No rooms found for this admin')
-        return rooms
+        return rooms.map(room => {
+            if (room.image) {
+                const baseUrl = 'http://localhost:3000';
+                const normalizedPath = room.image.replace(/\\/g, '/');
+                if (!normalizedPath.startsWith(baseUrl)) {
+                    room.image = `${baseUrl}/${normalizedPath}`;
+                } else {
+                    room.image = normalizedPath;
+                }
+            } else {
+                room.image = 'No tiene imagen';
+            }
+            return room;
+        });
     }
 
     async findByName(name: string): Promise<Room> {
@@ -108,33 +144,29 @@ export class RoomsService {
     
         if (!existingRoom) throw new NotFoundException('Room not found');
     
-        // Depuración: Verificar si el archivo se recibe
+        // Si hay un archivo nuevo
         if (file) {
-            console.log('Archivo recibido:', file);
-        } else {
-            console.log('No se recibió ningún archivo');
-        }
-    
-        // Eliminar la imagen anterior si se sube una nueva
-        if (file && existingRoom.image) {
-            const oldImagePath = path.join(__dirname, '..', '..', '..', existingRoom.image);
-            try {
-                if (fs.existsSync(oldImagePath)) {
-                    fs.unlinkSync(oldImagePath);
-                    console.log('Imagen anterior eliminada:', oldImagePath);
+            // Eliminar la imagen anterior si existe
+            if (existingRoom.image) {
+                const oldImagePath = path.join(__dirname, '..', '..', '..', existingRoom.image);
+                try {
+                    if (fs.existsSync(oldImagePath)) {
+                        fs.unlinkSync(oldImagePath);
+                        console.log('Imagen anterior eliminada:', oldImagePath);
+                    }
+                } catch (error) {
+                    console.error('Error al eliminar la imagen anterior:', error);
                 }
-            } catch (error) {
-                console.error('Error al eliminar la imagen anterior:', error);
             }
+            // Guardar la nueva imagen
+            data.image = file.path;
+        } else if ((data as any).currentImage) {
+            // Si no hay archivo nuevo pero hay una imagen actual, mantenerla
+            data.image = (data as any).currentImage;
+            delete (data as any).currentImage;
         }
     
         const room = this.roomsRepository.merge(existingRoom, data);
-    
-        // Guardar la nueva imagen si se proporciona
-        if (file) {
-            room.image = file.path;
-            console.log('Nueva imagen guardada:', room.image);
-        }
     
         // Actualizar la relación con el hotel si se proporciona
         if (data.hotel?.id) {
